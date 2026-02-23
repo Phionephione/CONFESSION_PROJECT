@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-5 animate__animated animate__fadeIn">
+<div class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-5">
         <h2 class="display-6 fw-bold">Global Whispers</h2>
         <a href="/whisper" class="btn btn-primary shadow">+ Whisper Something</a>
     </div>
@@ -24,43 +24,36 @@
                     {% endif %}
                 </div>
                 
-                <p class="confession-text mt-3">{{ post.content }}</p>
+                <p class="confession-text mt-3 text-white">{{ post.content }}</p>
                 
                 <div class="text-end mt-3 pt-2 border-top border-secondary">
-                    <!-- Toggle Reply Form Button -->
-                    <button class="btn btn-sm text-info fw-bold" 
-                            onclick="document.getElementById('reply-{{post.id}}').classList.toggle('d-none')">
-                        Reply
-                    </button>
-                    
+                    <button class="btn btn-sm text-info fw-bold" onclick="document.getElementById('reply-{{post.id}}').classList.toggle('d-none')">Reply</button>
                     {% if post.session_id == session['user_id'] %}
                         <a href="/delete/{{ post.id }}" class="btn btn-sm btn-outline-danger ms-2">Delete</a>
                     {% endif %}
                 </div>
 
-                <!-- HIDDEN REPLY FORM -->
-                <div id="reply-{{post.id}}" class="d-none mt-3 p-3 bg-black bg-opacity-25 rounded border border-secondary animate__animated animate__fadeIn">
+                <!-- REPLY FORM -->
+                <div id="reply-{{post.id}}" class="d-none mt-3 p-3 bg-dark rounded border border-secondary">
                     <form action="/wall" method="POST">
                         <input type="hidden" name="parent_id" value="{{ post.id }}">
-                        <textarea name="confession" class="form-control form-control-sm mb-2" placeholder="Write a respectful reply..." required></textarea>
-                        <div class="text-end">
-                            <button type="submit" class="btn btn-sm btn-primary px-3">Post Reply</button>
-                        </div>
+                        <textarea name="confession" class="form-control form-control-sm mb-2 text-white bg-transparent" placeholder="Reply to this whisper..." required></textarea>
+                        <div class="text-end"><button type="submit" class="btn btn-sm btn-primary">Post Reply</button></div>
                     </form>
                 </div>
 
                 <!-- REPLIES LIST -->
                 {% if post.replies %}
-                <div class="mt-4 ms-4 ms-md-5 ps-3 border-start border-secondary border-opacity-50">
+                <div class="mt-4 ms-4 ms-md-5 ps-3 border-start border-info border-opacity-50">
                     {% for reply in post.replies %}
-                    <div class="mb-3 p-2 bg-white bg-opacity-5 rounded">
-                        <div class="d-flex justify-content-between">
-                            <span class="author-tag" style="font-size: 0.7rem;">{{ reply.author }}</span>
+                    <div class="mb-3 p-3 bg-white bg-opacity-5 rounded border border-secondary shadow-sm">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="author-tag" style="font-size: 0.75rem; color: #03dac6 !important;">{{ reply.author }}</span>
                             {% if reply.session_id == session['user_id'] %}
                                 <a href="/delete/{{ reply.id }}" class="text-danger small text-decoration-none">×</a>
                             {% endif %}
                         </div>
-                        <p class="small mb-0 mt-1 text-light">{{ reply.content }}</p>
+                        <p class="mb-0 text-white" style="font-size: 0.95rem;">{{ reply.content }}</p>
                     </div>
                     {% endfor %}
                 </div>
