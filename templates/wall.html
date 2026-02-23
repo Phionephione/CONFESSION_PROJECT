@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-5 animate__animated animate__fadeIn">
+        <h2 class="display-6 fw-bold">Global Whispers</h2>
+        <a href="/whisper" class="btn btn-primary shadow">+ Whisper Something</a>
+    </div>
+
+    <div class="row">
+        {% if not posts %}
+            <div class="col-12 text-center mt-5">
+                <p class="text-secondary lead animate__animated animate__pulse animate__infinite">The void is silent...</p>
+            </div>
+        {% endif %}
+
+        {% for post in posts %}
+        <div class="col-md-9 mx-auto mb-5">
+            <!-- MAIN POST CARD -->
+            <div class="glass-card confession-card animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between">
+                    <span class="author-tag">{{ post.author }}</span>
+                    {% if post.session_id == session['user_id'] %}
+                        <span class="badge rounded-pill bg-info text-dark">You</span>
+                    {% endif %}
+                </div>
+                
+                <p class="confession-text mt-3">{{ post.content }}</p>
+                
+                <div class="text-end mt-3 pt-2 border-top border-secondary">
+                    <!-- Toggle Reply Form Button -->
+                    <button class="btn btn-sm text-info fw-bold" 
+                            onclick="document.getElementById('reply-{{post.id}}').classList.toggle('d-none')">
+                        Reply
+                    </button>
+                    
+                    {% if post.session_id == session['user_id'] %}
+                        <a href="/delete/{{ post.id }}" class="btn btn-sm btn-outline-danger ms-2">Delete</a>
+                    {% endif %}
+                </div>
+
+                <!-- HIDDEN REPLY FORM -->
+                <div id="reply-{{post.id}}" class="d-none mt-3 p-3 bg-black bg-opacity-25 rounded border border-secondary animate__animated animate__fadeIn">
+                    <form action="/wall" method="POST">
+                        <input type="hidden" name="parent_id" value="{{ post.id }}">
+                        <textarea name="confession" class="form-control form-control-sm mb-2" placeholder="Write a respectful reply..." required></textarea>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-sm btn-primary px-3">Post Reply</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- REPLIES LIST -->
+                {% if post.replies %}
+                <div class="mt-4 ms-4 ms-md-5 ps-3 border-start border-secondary border-opacity-50">
+                    {% for reply in post.replies %}
+                    <div class="mb-3 p-2 bg-white bg-opacity-5 rounded">
+                        <div class="d-flex justify-content-between">
+                            <span class="author-tag" style="font-size: 0.7rem;">{{ reply.author }}</span>
+                            {% if reply.session_id == session['user_id'] %}
+                                <a href="/delete/{{ reply.id }}" class="text-danger small text-decoration-none">×</a>
+                            {% endif %}
+                        </div>
+                        <p class="small mb-0 mt-1 text-light">{{ reply.content }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voidspeak - Say it. Leave it. Let it disappear.</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-dark text-light">
+    <nav class="navbar navbar-expand-lg navbar-dark border-bottom border-secondary py-3">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">VOIDSPEAK</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/about">About</a>
+                <a class="nav-link text-info fw-bold" href="/whisper">+ Whisper</a>
+                <a class="nav-link" href="/wall">The Wall</a>
+                <a class="nav-link" href="/my-secrets">My Secrets</a>
+                <a class="nav-link text-danger" href="/admin">Admin</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} animate__animated animate__shakeX">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

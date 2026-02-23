@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <!-- Try removing the 'reveal' class temporarily to see if it appears -->
+    <div class="col-md-8 glass-card animate__animated animate__fadeInUp">
+        <h2 class="mb-4" style="color: var(--accent);">About The Void</h2>
+        <p class="lead">This is a safe, anonymous corner of the internet.</p>
+        <p>Our mission is to provide a space where you can share your deepest thoughts, regrets, or funny stories without anyone knowing who you are.</p>
+        
+        <hr class="border-secondary my-4">
+        
+        <h4>How it Works</h4>
+        <ul>
+            <li><strong>Anonymity:</strong> Every time you enter, you get a new funny identity. No accounts, no passwords.</li>
+            <li><strong>AI Moderation:</strong> We use Google Gemini AI to ensure the wall stays free from hate speech.</li>
+            <li><strong>Control:</strong> You can delete your own confessions during your session.</li>
+        </ul>
+
+        <div class="mt-5 p-3 border border-secondary rounded">
+            <h5>Tech Stack</h5>
+            <p class="mb-0 small text-secondary">Backend: Flask (Python) | Database: SQLite | AI: Google Gemini | UI: Bootstrap & Animate.css</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

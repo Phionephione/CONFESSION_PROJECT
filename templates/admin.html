@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="glass-card">
+    <h2>Admin Moderation Panel</h2>
+    {% if not session.get('is_admin') %}
+    <form method="POST" class="mt-4">
+        <input type="password" name="password" class="form-control mb-2" placeholder="Enter Admin Password">
+        <button type="submit" class="btn btn-danger">Access Vault</button>
+    </form>
+    {% else %}
+    <table class="table table-dark mt-4">
+        <thead>
+            <tr>
+                <th>Author</th>
+                <th>Content</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for post in posts %}
+            <tr>
+                <td>{{ post.author }}</td>
+                <td>{{ post.content }}</td>
+                <td><a href="/delete/{{ post.id }}" class="btn btn-sm btn-danger">Delete</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+{% endblock %}

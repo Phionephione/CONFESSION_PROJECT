@@ -1,0 +1,17 @@
+# Python junk
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Secret Keys (VERY IMPORTANT)
+.env
+
+# Local Databases (Do not upload your local testing data)
+instance/
+*.db
+
+# OS junk
+.DS_Store
+Thumbs.db
