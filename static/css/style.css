@@ -1,115 +1,26 @@
-:root {
-    --glass: rgba(255, 255, 255, 0.05);
-    --border: rgba(255, 255, 255, 0.15);
-    --accent: #bb86fc;
-    --bg-dark: #0f0f12;
+/* style.css final tweak */
+.bg-white.bg-opacity-5 {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(5px);
 }
 
-body {
-    background-color: var(--bg-dark);
-    background-image: 
-        radial-gradient(at 0% 0%, rgba(187, 134, 252, 0.05) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(3, 218, 198, 0.05) 0px, transparent 50%);
-    color: #e0e0e0;
-    font-family: 'Inter', sans-serif;
-    min-height: 100vh;
-}
-
-/* Glassmorphism Card Logic */
-.glass-card {
-    background: var(--glass);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 25px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    margin-bottom: 25px;
-}
-
-/* Confession Specific Styling */
-.confession-card {
-    transition: all 0.3s ease;
-    border-left: 3px solid var(--accent);
-}
-
-.confession-card:hover {
-    transform: scale(1.01);
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.confession-text {
+.text-white {
     color: #ffffff !important;
-    font-size: 1.15rem;
-    line-height: 1.6;
-    font-weight: 400;
 }
 
-.author-tag {
-    color: var(--accent);
-    font-weight: 700;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
+textarea {
+    color: white !important;
+}}
+/* style.css final tweak */
+.bg-white.bg-opacity-5 {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(5px);
 }
 
-/* Form Controls */
-textarea.form-control {
-    background: rgba(0, 0, 0, 0.4) !important;
-    border: 1px solid var(--border) !important;
+.text-white {
     color: #ffffff !important;
-    border-radius: 12px;
-    padding: 15px;
 }
 
-textarea.form-control:focus {
-    box-shadow: 0 0 10px var(--accent);
-    border-color: var(--accent) !important;
-}
-
-/* Buttons */
-.btn-primary {
-    background: var(--accent);
-    border: none;
-    color: #000;
-    font-weight: 700;
-    border-radius: 10px;
-    padding: 12px;
-    transition: all 0.3s;
-}
-
-.btn-primary:hover {
-    background: #d1b1ff;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(187, 134, 252, 0.4);
-}
-
-/* Animations */
-.animate__animated {
-    animation-duration: 0.8s;
-}
-
-/* Hide scrollbar but allow scrolling */
-::-webkit-scrollbar {
-    width: 6px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 10px;
-}
-/* Style for replies */
-.ms-5 {
-    margin-left: 3rem !important;
-}
-
-.bg-opacity-25 {
-    background-color: rgba(255, 255, 255, 0.03) !important;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.small {
-    color: #cccccc;
+textarea {
+    color: white !important;
 }
