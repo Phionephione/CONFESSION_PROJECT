@@ -173,3 +173,37 @@ textarea::placeholder {
 .animate__animated {
     animation-duration: 0.8s;
 }
+/* --- EXISTING CSS ABOVE --- */
+
+/* MOBILE RESPONSIVENESS FIXES */
+@media (max-width: 768px) {
+    /* Shrink the huge landing page title */
+    .display-1 {
+        font-size: 3rem !important;
+        letter-spacing: -1px !important;
+    }
+
+    /* Shrink sub-titles */
+    h1, h2 {
+        font-size: 1.8rem !important;
+    }
+
+    /* Adjust navbar for mobile */
+    .navbar-collapse {
+        background: rgba(0, 0, 0, 0.9);
+        padding: 20px;
+        border-radius: 15px;
+        margin-top: 15px;
+        border: 1px solid var(--border);
+    }
+
+    /* Make cards fit better on narrow screens */
+    .glass-card {
+        padding: 15px !important;
+    }
+
+    /* Adjust the "Whisper to the Void" slogan */
+    .lead {
+        font-size: 1rem !important;
+    }
+}
