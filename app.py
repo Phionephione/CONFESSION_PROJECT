@@ -11,11 +11,8 @@ from datetime import timedelta
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "voidspeak_ultra_final_titan")
-
-# --- SESSION SECURITY ---
-# Admin session expires when the browser is closed
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=15)
+app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final_999")
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=20)
 
 # --- DATABASE ---
 db_url = os.getenv("DATABASE_URL")
@@ -27,7 +24,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"connect_timeout": 1
 
 db = SQLAlchemy(app)
 
-# --- GEMINI CONFIG ---
+# --- AI ---
 AI_KEY = os.getenv("GEMINI_API_KEY")
 if AI_KEY:
     genai.configure(api_key=AI_KEY)
@@ -48,39 +45,23 @@ class Confession(db.Model):
 with app.app_context():
     db.create_all()
 
-# --- THE ULTIMATE SLANG FILTER ---
+# --- FILTER ---
 def analyze_text(text):
     msg = text.lower()
-    # HARD BLOCK: Instant detection for common Romanized slang
-    bad_list = [
-        "fuck", "bitch", "shit", "asshole", "gandu", "ganndu", "bsdk", 
-        "loade", "bolimane", "nin ammun", "sulay", "punda", "nan maga"
-    ]
-    
+    bad_list = ["fuck", "bitch", "shit", "asshole", "gandu", "bsdk", "loade", "nin ammun", "bolimane"]
     for word in bad_list:
-        if word in msg:
-            return True, f"SYSTEM BLOCK: Regional Slang detected [{word}]", 10
+        if word in msg: return True, f"Blocked: Regional Slang [{word}]", 10
 
     if not model: return False, "CLEAN", 0
-    
     try:
         s_s = { HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE }
-        prompt = f"""
-        Moderate this text for an Indian audience: '{text}'
-        Identify toxic English OR transliterated Indian slang (Kannada, Hindi, etc.).
-        Return ONLY a JSON: {{"status": "TOXIC" or "CLEAN", "score": 0-10, "reason": "short explanation"}}
-        """
+        prompt = f"Moderate this Indian social media text: '{text}'. Identify toxic English or transliterated slang (Kannada/Hindi). Return ONLY JSON: {{\"status\": \"TOXIC\" or \"CLEAN\", \"score\": 0-10, \"reason\": \"string\"}}"
         response = model.generate_content(prompt, safety_settings=s_s)
-        clean_json = response.text.replace('```json', '').replace('```', '').strip()
-        data = json.loads(clean_json)
-        
-        is_toxic = (data.get('status') == "TOXIC" or data.get('score', 0) >= 7)
-        return is_toxic, data.get('reason', 'CLEAN'), data.get('score', 0)
-    except:
-        return False, "CLEAN", 0
+        data = json.loads(response.text.replace('```json', '').replace('```', '').strip())
+        return (data.get('status') == "TOXIC" or data.get('score', 0) >= 8), data.get('reason', 'CLEAN'), data.get('score', 0)
+    except: return False, "CLEAN", 0
 
 # --- ROUTES ---
-
 @app.route('/')
 def index(): return render_template('index.html')
 
@@ -124,12 +105,11 @@ def wall():
     posts = Confession.query.filter_by(parent_id=None).order_by(Confession.id.desc()).all()
     return render_template('wall.html', posts=posts)
 
-# FIXED ROUTE: Ensure this matches the link in base.html
 @app.route('/my-secrets')
 def profile():
     if 'user_id' not in session: return redirect(url_for('login'))
-    my_posts = Confession.query.filter_by(session_id=session['user_id']).all()
-    return render_template('profile.html', posts=my_posts)
+    posts = Confession.query.filter_by(session_id=session['user_id']).all()
+    return render_template('profile.html', posts=posts)
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
@@ -137,13 +117,8 @@ def admin():
         if request.form.get('password') == "admin123":
             session['is_admin'] = True
             return redirect(url_for('admin'))
-        else:
-            flash("Invalid Admin Password", "danger")
-
-    if session.get('is_admin'):
-        posts = Confession.query.order_by(Confession.toxicity_score.desc()).all()
-    else:
-        posts = []
+        else: flash("Invalid Admin Password", "danger")
+    posts = Confession.query.order_by(Confession.toxicity_score.desc()).all() if session.get('is_admin') else []
     return render_template('admin.html', posts=posts)
 
 @app.route('/admin-logout')
