@@ -135,35 +135,4 @@ def delete_post(id):
     return redirect(request.referrer or url_for('wall'))
 
 if __name__ == '__main__':
-    app.run(debug=True)        else:
-            reply = Confession(content=text, author=session['username'], session_id=session['user_id'], parent_id=p_id)
-            db.session.add(reply)
-            db.session.commit()
-            flash("Reply added!", "success")
-    posts = Confession.query.filter_by(parent_id=None).order_by(Confession.id.desc()).all()
-    return render_template('wall.html', posts=posts)
-
-@app.route('/my-secrets')
-def profile():
-    if 'user_id' not in session: return redirect(url_for('login'))
-    my_posts = Confession.query.filter_by(session_id=session['user_id']).all()
-    return render_template('profile.html', posts=my_posts)
-
-@app.route('/admin', methods=['GET', 'POST'])
-def admin():
-    if request.method == 'POST':
-        if request.form.get('password') == "admin123":
-            session['is_admin'] = True
-    all_posts = Confession.query.all() if session.get('is_admin') else []
-    return render_template('admin.html', posts=all_posts)
-
-@app.route('/delete/<int:id>')
-def delete_post(id):
-    post = Confession.query.get(id)
-    if post and (session.get('is_admin') or post.session_id == session.get('user_id')):
-        db.session.delete(post)
-        db.session.commit()
-    return redirect(request.referrer or url_for('wall'))
-
-if __name__ == '__main__':
     app.run(debug=True)
