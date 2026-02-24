@@ -11,11 +11,11 @@ from datetime import timedelta
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final_ultra")
+app.secret_key = os.getenv("SECRET_KEY", "voidspeak_ultra_final_titan")
 
 # --- SESSION SECURITY ---
-# This makes the admin login "non-permanent" - it clears when the browser closes
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=10)
+# Admin session expires when the browser is closed
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=15)
 
 # --- DATABASE ---
 db_url = os.getenv("DATABASE_URL")
@@ -23,7 +23,7 @@ if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"connect_timeout": 7}}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"connect_timeout": 10}}
 
 db = SQLAlchemy(app)
 
@@ -48,11 +48,14 @@ class Confession(db.Model):
 with app.app_context():
     db.create_all()
 
-# --- THE ULTIMATE MULTI-LANGUAGE FILTER ---
+# --- THE ULTIMATE SLANG FILTER ---
 def analyze_text(text):
     msg = text.lower()
-    # Added Transliterated Slang (Kannada/Hindi/English) as hard backup
-    bad_list = ["fuck", "bitch", "shit", "asshole", "ganndu", "bolimane", "loade", "bsdk", "gandu"]
+    # HARD BLOCK: Instant detection for common Romanized slang
+    bad_list = [
+        "fuck", "bitch", "shit", "asshole", "gandu", "ganndu", "bsdk", 
+        "loade", "bolimane", "nin ammun", "sulay", "punda", "nan maga"
+    ]
     
     for word in bad_list:
         if word in msg:
@@ -62,16 +65,9 @@ def analyze_text(text):
     
     try:
         s_s = { HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE }
-        # UPDATED PROMPT: Explicitly asking for Indian Regional Slang detection
         prompt = f"""
-        ACT AS A SOCIAL MEDIA MODERATOR FOR INDIA.
-        Analyze this text: '{text}'
-        The text might be in English, or Indian languages like Kannada, Hindi, etc., written in the ROMAN/ENGLISH alphabet.
-        
-        Detection Rules:
-        1. Look for transliterated insults (e.g., 'ganndu', 'badava', 'punda', etc.)
-        2. Look for toxic English words.
-        
+        Moderate this text for an Indian audience: '{text}'
+        Identify toxic English OR transliterated Indian slang (Kannada, Hindi, etc.).
         Return ONLY a JSON: {{"status": "TOXIC" or "CLEAN", "score": 0-10, "reason": "short explanation"}}
         """
         response = model.generate_content(prompt, safety_settings=s_s)
@@ -84,6 +80,7 @@ def analyze_text(text):
         return False, "CLEAN", 0
 
 # --- ROUTES ---
+
 @app.route('/')
 def index(): return render_template('index.html')
 
@@ -93,8 +90,8 @@ def about(): return render_template('about.html')
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        adj = ["Cringe", "Salty", "Moody", "Epic", "Savage"]
-        noun = ["Potato", "Wizard", "Ninja", "Taco", "Panda"]
+        adj = ["Savage", "Moody", "Epic", "Salty"]
+        noun = ["Potato", "Wizard", "Ninja", "Taco"]
         session['username'] = f"{random.choice(adj)}{random.choice(noun)}{random.randint(10, 99)}"
         session['user_id'] = os.urandom(16).hex()
         return redirect(url_for('wall'))
@@ -107,7 +104,7 @@ def whisper():
         text = request.form.get('confession')
         toxic, reason, score = analyze_text(text)
         if toxic:
-            flash(f"⚠️ {reason}. (Severity: {score}/10)", "danger")
+            flash(f"⚠️ {reason}. (Score: {score}/10)", "danger")
             return render_template('whisper.html', last_text=text)
         db.session.add(Confession(content=text, author=session['username'], session_id=session['user_id'], toxicity_score=score))
         db.session.commit()
@@ -124,19 +121,24 @@ def wall():
         if not toxic:
             db.session.add(Confession(content=text, author=session['username'], session_id=session['user_id'], parent_id=p_id, toxicity_score=score))
             db.session.commit()
-            flash("Reply added.", "success")
     posts = Confession.query.filter_by(parent_id=None).order_by(Confession.id.desc()).all()
     return render_template('wall.html', posts=posts)
+
+# FIXED ROUTE: Ensure this matches the link in base.html
+@app.route('/my-secrets')
+def profile():
+    if 'user_id' not in session: return redirect(url_for('login'))
+    my_posts = Confession.query.filter_by(session_id=session['user_id']).all()
+    return render_template('profile.html', posts=my_posts)
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if request.method == 'POST':
         if request.form.get('password') == "admin123":
             session['is_admin'] = True
-            session.permanent = False # Session dies when browser closes
             return redirect(url_for('admin'))
         else:
-            flash("Wrong Password", "danger")
+            flash("Invalid Admin Password", "danger")
 
     if session.get('is_admin'):
         posts = Confession.query.order_by(Confession.toxicity_score.desc()).all()
