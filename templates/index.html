@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="vh-100 d-flex flex-column justify-content-center align-items-center text-center">
-    <h1 class="display-1 fw-bold animate__animated animate__zoomIn">WHISPER TO THE <span style="color: var(--accent);">VOIDSPEAK</span></h1>
-    <p class="lead mb-4 animate__animated animate__fadeInUp animate__delay-1s">An anonymous corner of the internet to set your thoughts free. “Say it. Leave it. Let it disappear.”</p>
-    <div class="animate__animated animate__fadeInUp animate__delay-2s">
-        <a href="/login" class="btn btn-primary btn-lg px-5">Get Started</a>
+<div class="vh-100 d-flex flex-column justify-content-center align-items-center text-center px-3">
+    <h1 class="display-1 fw-bold animate__animated animate__zoomIn">Voidspeak</h1>
+    
+    <p class="lead mb-4 mt-2 animate__animated animate__fadeInUp animate__delay-1s text-secondary italic">
+        "Say it. Leave it. Let it disappear."
+    </p>
+    
+    <div class="animate__animated animate__fadeInUp animate__delay-2s mt-3">
+        <a href="/login" class="btn btn-primary btn-lg px-5 py-3 shadow-lg">Enter the Void</a>
     </div>
 </div>
 {% endblock %}
