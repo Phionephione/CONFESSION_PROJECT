@@ -1,6 +1,6 @@
 import os
 import random
-import json # New import for parsing AI response
+import json
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
@@ -10,9 +10,9 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_edition")
+app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final")
 
-# --- DATABASE ---
+# --- DATABASE CONFIG ---
 db_url = os.getenv("DATABASE_URL")
 if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -20,11 +20,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- AI CONFIG ---
+# --- NEW GEMINI CONFIG (Updated Model Name) ---
 AI_KEY = os.getenv("GEMINI_API_KEY")
 if AI_KEY:
     genai.configure(api_key=AI_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    # Using gemini-1.5-flash as it is the current stable free-tier model
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     model = None
 
@@ -34,36 +35,41 @@ class Confession(db.Model):
     content = db.Column(db.String(500), nullable=False)
     author = db.Column(db.String(50), nullable=False)
     session_id = db.Column(db.String(100), nullable=False)
-    toxicity_score = db.Column(db.Integer, default=0) # NEW COLUMN
+    toxicity_score = db.Column(db.Integer, default=0)
     parent_id = db.Column(db.Integer, db.ForeignKey('confession.id'), nullable=True)
     replies = db.relationship('Confession', backref=db.backref('parent', remote_side=[id]), lazy=True, cascade="all, delete")
 
 with app.app_context():
     db.create_all()
 
-# --- THE ADVANCED FILTER (AI + Scoring) ---
+# --- THE ADVANCED FILTER ---
 def analyze_text(text):
     msg = text.lower()
     bad_list = ["fuck", "bitch", "shit", "asshole", "bastard", "dick", "pussy"]
     
-    # Check Blocklist first
     for word in bad_list:
         if word in msg:
-            return True, f"BLOCKLIST: [{word}]", 10 # Instant 10/10 toxicity
+            return True, f"BLOCKLIST: [{word}]", 10
 
     if not model: return False, "CLEAN", 0
     
     try:
-        s_s = { HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE }
-        # We ask Gemini to return JSON for easier parsing
+        s_s = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
+        # Updated prompt to be more reliable
         prompt = f"""
-        Moderate this text: '{text}'
-        Return ONLY a JSON object with this format:
-        {{"status": "TOXIC" or "CLEAN", "score": integer 0-10, "reason": "short string"}}
+        Analyze this text: '{text}'
+        Return ONLY a JSON object: {{"status": "TOXIC" or "CLEAN", "score": 0-10, "reason": "reason"}}
         """
         response = model.generate_content(prompt, safety_settings=s_s)
-        # Parse the JSON from Gemini
-        data = json.loads(response.text.strip())
+        
+        # Clean the response text (sometimes AI adds markdown backticks)
+        clean_json = response.text.replace('```json', '').replace('```', '').strip()
+        data = json.loads(clean_json)
         
         is_toxic = (data.get('status') == "TOXIC" or data.get('score', 0) >= 7)
         return is_toxic, data.get('reason', 'CLEAN'), data.get('score', 0)
@@ -94,11 +100,9 @@ def whisper():
     if request.method == 'POST':
         text = request.form.get('confession')
         toxic, reason, score = analyze_text(text)
-        
         if toxic:
-            flash(f"⚠️ {reason}. (Toxicity: {score}/10). Rejected!", "danger")
+            flash(f"⚠️ {reason}. (Score: {score}/10)", "danger")
             return render_template('whisper.html', last_text=text)
-        
         new_post = Confession(content=text, author=session['username'], session_id=session['user_id'], toxicity_score=score)
         db.session.add(new_post)
         db.session.commit()
@@ -126,13 +130,9 @@ def profile():
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    # RESTORED PASSWORD LOGIC
     if request.method == 'POST':
         if request.form.get('password') == "admin123":
             session['is_admin'] = True
-        else:
-            flash("Invalid Admin Password", "danger")
-
     posts = Confession.query.order_by(Confession.toxicity_score.desc()).all() if session.get('is_admin') else []
     return render_template('admin.html', posts=posts)
 
