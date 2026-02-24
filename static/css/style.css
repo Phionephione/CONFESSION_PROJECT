@@ -1,26 +1,175 @@
-/* style.css final tweak */
+/* --- VOIDSPEAK GLOBAL THEME --- */
+:root {
+    --glass: rgba(255, 255, 255, 0.05);
+    --glass-heavy: rgba(255, 255, 255, 0.1);
+    --border: rgba(255, 255, 255, 0.15);
+    --accent: #bb86fc;         /* Purple */
+    --accent-secondary: #03dac6; /* Teal */
+    --bg-dark: #0f0f12;
+}
+
+body {
+    background-color: var(--bg-dark);
+    /* Subtle radial gradient for depth */
+    background-image: 
+        radial-gradient(at 0% 0%, rgba(187, 134, 252, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(3, 218, 198, 0.08) 0px, transparent 50%);
+    color: #ffffff !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+/* --- THE GLASS CARD --- */
+.glass-card {
+    background: var(--glass);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+    margin-bottom: 25px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent);
+}
+
+/* --- CONFESSION TEXT --- */
+.confession-card {
+    border-left: 4px solid var(--accent);
+}
+
+.confession-text {
+    color: #ffffff !important; /* Force text to be bright white */
+    font-size: 1.15rem;
+    line-height: 1.6;
+    font-weight: 400;
+    word-wrap: break-word;
+}
+
+.author-tag {
+    color: var(--accent) !important;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+/* --- REPLIES STYLING (The fix for your white boxes) --- */
 .bg-white.bg-opacity-5 {
-    background-color: rgba(255, 255, 255, 0.05) !important;
-    backdrop-filter: blur(5px);
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(10px);
+    padding: 15px !important;
+    margin-top: 12px;
+}
+
+.border-start.border-info {
+    border-color: var(--accent-secondary) !important;
+    border-width: 2px !important;
 }
 
 .text-white {
     color: #ffffff !important;
 }
 
-textarea {
-    color: white !important;
-}}
-/* style.css final tweak */
-.bg-white.bg-opacity-5 {
-    background-color: rgba(255, 255, 255, 0.05) !important;
-    backdrop-filter: blur(5px);
+/* --- INPUTS & FORMS --- */
+textarea.form-control {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid var(--border) !important;
+    color: #ffffff !important; /* Important: ensures user sees what they type */
+    border-radius: 12px;
+    padding: 15px;
+    font-size: 1rem;
 }
 
-.text-white {
-    color: #ffffff !important;
+textarea.form-control:focus {
+    box-shadow: 0 0 15px var(--accent);
+    border-color: var(--accent) !important;
+    background: rgba(0, 0, 0, 0.6) !important;
 }
 
-textarea {
-    color: white !important;
+textarea::placeholder {
+    color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* --- BUTTONS --- */
+.btn-primary {
+    background: var(--accent);
+    border: none;
+    color: #000 !important;
+    font-weight: 700;
+    border-radius: 10px;
+    padding: 12px 24px;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: #d1b1ff;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(187, 134, 252, 0.5);
+}
+
+.btn-outline-danger {
+    border-color: #ff5252;
+    color: #ff5252;
+}
+
+.btn-outline-danger:hover {
+    background-color: #ff5252;
+    color: white;
+}
+
+/* --- NAV BAR --- */
+.navbar {
+    background: rgba(15, 15, 18, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 1000;
+}
+
+.nav-link {
+    color: #cccccc !important;
+    transition: color 0.3s;
+}
+
+.nav-link:hover {
+    color: var(--accent) !important;
+}
+
+/* --- UTILITIES --- */
+.italic {
+    font-style: italic;
+}
+
+.badge.bg-info {
+    background-color: var(--accent-secondary) !important;
+    color: #000 !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+}
+
+/* Animations fixes */
+.animate__animated {
+    animation-duration: 0.8s;
 }
