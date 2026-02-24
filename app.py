@@ -11,8 +11,8 @@ from datetime import timedelta
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final_999")
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=20)
+app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final_v3")
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
 # --- DATABASE ---
 db_url = os.getenv("DATABASE_URL")
@@ -24,7 +24,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"connect_timeout": 1
 
 db = SQLAlchemy(app)
 
-# --- AI ---
+# --- GEMINI CONFIG ---
 AI_KEY = os.getenv("GEMINI_API_KEY")
 if AI_KEY:
     genai.configure(api_key=AI_KEY)
@@ -45,21 +45,32 @@ class Confession(db.Model):
 with app.app_context():
     db.create_all()
 
-# --- FILTER ---
+# --- THE SCORING FILTER ---
 def analyze_text(text):
     msg = text.lower()
-    bad_list = ["fuck", "bitch", "shit", "asshole", "gandu", "bsdk", "loade", "nin ammun", "bolimane"]
+    # HARD BLOCKLIST
+    bad_list = ["fuck", "bitch", "shit", "asshole", "gandu", "bsdk", "loade", "nin ammun", "bolimane", "idot", "idiot"]
     for word in bad_list:
-        if word in msg: return True, f"Blocked: Regional Slang [{word}]", 10
+        if word in msg:
+            return True, f"AUTO-BLOCK: [{word}]", 10
 
     if not model: return False, "CLEAN", 0
     try:
         s_s = { HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE }
-        prompt = f"Moderate this Indian social media text: '{text}'. Identify toxic English or transliterated slang (Kannada/Hindi). Return ONLY JSON: {{\"status\": \"TOXIC\" or \"CLEAN\", \"score\": 0-10, \"reason\": \"string\"}}"
+        prompt = f"Rate toxicity 0-10: '{text}'. 0=Kind, 5=Rude, 10=Abuse. Return ONLY JSON: {{\"score\": int, \"status\": \"string\", \"reason\": \"string\"}}"
         response = model.generate_content(prompt, safety_settings=s_s)
-        data = json.loads(response.text.replace('```json', '').replace('```', '').strip())
-        return (data.get('status') == "TOXIC" or data.get('score', 0) >= 8), data.get('reason', 'CLEAN'), data.get('score', 0)
-    except: return False, "CLEAN", 0
+        
+        # Clean JSON
+        raw = response.text.strip()
+        clean_json = raw[raw.find("{"):raw.rfind("}")+1]
+        data = json.loads(clean_json)
+        
+        score = data.get('score', 0)
+        # Block ONLY if 10
+        return (score >= 10), data.get('reason', 'CLEAN'), score
+    except Exception as e:
+        print(f"AI ERROR: {e}")
+        return False, "CLEAN", 0
 
 # --- ROUTES ---
 @app.route('/')
@@ -71,8 +82,8 @@ def about(): return render_template('about.html')
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        adj = ["Savage", "Moody", "Epic", "Salty"]
-        noun = ["Potato", "Wizard", "Ninja", "Taco"]
+        adj = ["Wild", "Savage", "Moody", "Dark"]
+        noun = ["Potato", "Wizard", "Ninja", "Void"]
         session['username'] = f"{random.choice(adj)}{random.choice(noun)}{random.randint(10, 99)}"
         session['user_id'] = os.urandom(16).hex()
         return redirect(url_for('wall'))
@@ -85,10 +96,15 @@ def whisper():
         text = request.form.get('confession')
         toxic, reason, score = analyze_text(text)
         if toxic:
-            flash(f"⚠️ {reason}. (Score: {score}/10)", "danger")
+            flash(f"🚫 BLOCKED: Intensity 10/10. Too much toxicity!", "danger")
             return render_template('whisper.html', last_text=text)
+        
         db.session.add(Confession(content=text, author=session['username'], session_id=session['user_id'], toxicity_score=score))
         db.session.commit()
+        if score >= 5:
+            flash(f"⚠️ Flagged (Intensity: {score}/10). Whisper sent.", "warning")
+        else:
+            flash("Whisper absorbed.", "success")
         return redirect(url_for('wall'))
     return render_template('whisper.html')
 
@@ -102,6 +118,8 @@ def wall():
         if not toxic:
             db.session.add(Confession(content=text, author=session['username'], session_id=session['user_id'], parent_id=p_id, toxicity_score=score))
             db.session.commit()
+        else:
+            flash("🚫 Toxic reply blocked.", "danger")
     posts = Confession.query.filter_by(parent_id=None).order_by(Confession.id.desc()).all()
     return render_template('wall.html', posts=posts)
 
@@ -113,12 +131,15 @@ def profile():
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    if request.method == 'POST':
-        if request.form.get('password') == "admin123":
-            session['is_admin'] = True
-            return redirect(url_for('admin'))
-        else: flash("Invalid Admin Password", "danger")
-    posts = Confession.query.order_by(Confession.toxicity_score.desc()).all() if session.get('is_admin') else []
+    if request.method == 'POST' and request.form.get('password') == "admin123":
+        session['is_admin'] = True
+        return redirect(url_for('admin'))
+    
+    if session.get('is_admin'):
+        # Sort by highest toxicity first so Admin sees the worst stuff at the top
+        posts = Confession.query.order_by(Confession.toxicity_score.desc()).all()
+    else:
+        posts = []
     return render_template('admin.html', posts=posts)
 
 @app.route('/admin-logout')
