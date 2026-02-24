@@ -10,7 +10,7 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final")
+app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final_secure")
 
 # --- DATABASE CONFIG ---
 db_url = os.getenv("DATABASE_URL")
@@ -20,11 +20,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- NEW GEMINI CONFIG (Updated Model Name) ---
+# --- GEMINI 1.5 FLASH CONFIG ---
 AI_KEY = os.getenv("GEMINI_API_KEY")
 if AI_KEY:
     genai.configure(api_key=AI_KEY)
-    # Using gemini-1.5-flash as it is the current stable free-tier model
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     model = None
@@ -42,11 +41,10 @@ class Confession(db.Model):
 with app.app_context():
     db.create_all()
 
-# --- THE ADVANCED FILTER ---
+# --- MODERATION & SCORING ---
 def analyze_text(text):
     msg = text.lower()
     bad_list = ["fuck", "bitch", "shit", "asshole", "bastard", "dick", "pussy"]
-    
     for word in bad_list:
         if word in msg:
             return True, f"BLOCKLIST: [{word}]", 10
@@ -54,27 +52,15 @@ def analyze_text(text):
     if not model: return False, "CLEAN", 0
     
     try:
-        s_s = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-        }
-        # Updated prompt to be more reliable
-        prompt = f"""
-        Analyze this text: '{text}'
-        Return ONLY a JSON object: {{"status": "TOXIC" or "CLEAN", "score": 0-10, "reason": "reason"}}
-        """
+        s_s = { HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE }
+        prompt = f"Analyze: '{text}'. Return ONLY JSON: {{\"status\": \"TOXIC\" or \"CLEAN\", \"score\": 0-10, \"reason\": \"string\"}}"
         response = model.generate_content(prompt, safety_settings=s_s)
-        
-        # Clean the response text (sometimes AI adds markdown backticks)
         clean_json = response.text.replace('```json', '').replace('```', '').strip()
         data = json.loads(clean_json)
         
-        is_toxic = (data.get('status') == "TOXIC" or data.get('score', 0) >= 7)
+        is_toxic = (data.get('status') == "TOXIC" or data.get('score', 0) >= 8)
         return is_toxic, data.get('reason', 'CLEAN'), data.get('score', 0)
-    except Exception as e:
-        print(f"AI ERROR: {e}")
+    except:
         return False, "CLEAN", 0
 
 # --- ROUTES ---
@@ -103,8 +89,7 @@ def whisper():
         if toxic:
             flash(f"⚠️ {reason}. (Score: {score}/10)", "danger")
             return render_template('whisper.html', last_text=text)
-        new_post = Confession(content=text, author=session['username'], session_id=session['user_id'], toxicity_score=score)
-        db.session.add(new_post)
+        db.session.add(Confession(content=text, author=session['username'], session_id=session['user_id'], toxicity_score=score))
         db.session.commit()
         return redirect(url_for('wall'))
     return render_template('whisper.html')
@@ -122,19 +107,23 @@ def wall():
     posts = Confession.query.filter_by(parent_id=None).order_by(Confession.id.desc()).all()
     return render_template('wall.html', posts=posts)
 
-@app.route('/my-secrets')
-def profile():
-    if 'user_id' not in session: return redirect(url_for('login'))
-    posts = Confession.query.filter_by(session_id=session['user_id']).all()
-    return render_template('profile.html', posts=posts)
-
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if request.method == 'POST':
         if request.form.get('password') == "admin123":
             session['is_admin'] = True
+            return redirect(url_for('admin'))
+        else:
+            flash("Invalid Password", "danger")
+    
     posts = Confession.query.order_by(Confession.toxicity_score.desc()).all() if session.get('is_admin') else []
     return render_template('admin.html', posts=posts)
+
+@app.route('/admin-logout')
+def admin_logout():
+    session.pop('is_admin', None)
+    flash("Admin logged out.", "info")
+    return redirect(url_for('admin'))
 
 @app.route('/delete/<int:id>')
 def delete_post(id):
