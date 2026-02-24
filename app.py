@@ -6,36 +6,36 @@ from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from datetime import timedelta
 
-# 1. INITIAL SETUP
 load_dotenv()
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final_secure_999")
 
-# 2. DATABASE CONFIG (With 5-second timeout to prevent black screen)
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "voidspeak_titan_final_ultra")
+
+# --- SESSION SECURITY ---
+# This makes the admin login "non-permanent" - it clears when the browser closes
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=10)
+
+# --- DATABASE ---
 db_url = os.getenv("DATABASE_URL")
 if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
-
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True,
-    "connect_args": {"connect_timeout": 5}
-}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"connect_timeout": 7}}
 
 db = SQLAlchemy(app)
 
-# 3. GEMINI 1.5 FLASH CONFIG
+# --- GEMINI CONFIG ---
 AI_KEY = os.getenv("GEMINI_API_KEY")
 if AI_KEY:
     genai.configure(api_key=AI_KEY)
-    # Using gemini-1.5-flash (most stable for free tier)
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     model = None
 
-# 4. DATABASE MODEL
+# --- MODELS ---
 class Confession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.String(500), nullable=False)
@@ -45,60 +45,56 @@ class Confession(db.Model):
     parent_id = db.Column(db.Integer, db.ForeignKey('confession.id'), nullable=True)
     replies = db.relationship('Confession', backref=db.backref('parent', remote_side=[id]), lazy=True, cascade="all, delete")
 
-# 5. AUTO-INITIALIZE TABLES
 with app.app_context():
-    try:
-        db.create_all()
-        print("--- DATABASE INITIALIZED ---")
-    except Exception as e:
-        print(f"--- DATABASE ERROR: {e} ---")
+    db.create_all()
 
-# 6. AI ANALYSIS & SCORING LOGIC
+# --- THE ULTIMATE MULTI-LANGUAGE FILTER ---
 def analyze_text(text):
     msg = text.lower()
-    # Layer 1: Instant Blocklist
-    bad_list = ["fuck", "bitch", "shit", "asshole", "bastard", "dick", "pussy"]
+    # Added Transliterated Slang (Kannada/Hindi/English) as hard backup
+    bad_list = ["fuck", "bitch", "shit", "asshole", "ganndu", "bolimane", "loade", "bsdk", "gandu"]
+    
     for word in bad_list:
         if word in msg:
-            return True, f"BLOCKLIST: [{word}]", 10
+            return True, f"SYSTEM BLOCK: Regional Slang detected [{word}]", 10
 
     if not model: return False, "CLEAN", 0
     
     try:
-        # Safety settings allow AI to process profanity so it can score it
         s_s = { HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE }
-        
+        # UPDATED PROMPT: Explicitly asking for Indian Regional Slang detection
         prompt = f"""
+        ACT AS A SOCIAL MEDIA MODERATOR FOR INDIA.
         Analyze this text: '{text}'
-        Return ONLY a JSON object: {{"status": "TOXIC" or "CLEAN", "score": 0-10, "reason": "short string"}}
+        The text might be in English, or Indian languages like Kannada, Hindi, etc., written in the ROMAN/ENGLISH alphabet.
+        
+        Detection Rules:
+        1. Look for transliterated insults (e.g., 'ganndu', 'badava', 'punda', etc.)
+        2. Look for toxic English words.
+        
+        Return ONLY a JSON: {{"status": "TOXIC" or "CLEAN", "score": 0-10, "reason": "short explanation"}}
         """
         response = model.generate_content(prompt, safety_settings=s_s)
-        
-        # Clean markdown backticks if AI adds them
         clean_json = response.text.replace('```json', '').replace('```', '').strip()
         data = json.loads(clean_json)
         
-        is_toxic = (data.get('status') == "TOXIC" or data.get('score', 0) >= 8)
+        is_toxic = (data.get('status') == "TOXIC" or data.get('score', 0) >= 7)
         return is_toxic, data.get('reason', 'CLEAN'), data.get('score', 0)
-    except Exception as e:
-        print(f"AI Error: {e}")
+    except:
         return False, "CLEAN", 0
 
-# 7. ROUTES
-
+# --- ROUTES ---
 @app.route('/')
-def index():
-    return render_template('index.html')
+def index(): return render_template('index.html')
 
 @app.route('/about')
-def about():
-    return render_template('about.html')
+def about(): return render_template('about.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        adj = ["Cringe", "Salty", "Moody", "Epic", "Savage", "Neon"]
-        noun = ["Potato", "Wizard", "Cactus", "Ninja", "Taco", "Panda"]
+        adj = ["Cringe", "Salty", "Moody", "Epic", "Savage"]
+        noun = ["Potato", "Wizard", "Ninja", "Taco", "Panda"]
         session['username'] = f"{random.choice(adj)}{random.choice(noun)}{random.randint(10, 99)}"
         session['user_id'] = os.urandom(16).hex()
         return redirect(url_for('wall'))
@@ -110,13 +106,10 @@ def whisper():
     if request.method == 'POST':
         text = request.form.get('confession')
         toxic, reason, score = analyze_text(text)
-        
         if toxic:
-            flash(f"⚠️ {reason}. (Toxicity: {score}/10). Rejected!", "danger")
+            flash(f"⚠️ {reason}. (Severity: {score}/10)", "danger")
             return render_template('whisper.html', last_text=text)
-        
-        new_post = Confession(content=text, author=session['username'], session_id=session['user_id'], toxicity_score=score)
-        db.session.add(new_post)
+        db.session.add(Confession(content=text, author=session['username'], session_id=session['user_id'], toxicity_score=score))
         db.session.commit()
         return redirect(url_for('wall'))
     return render_template('whisper.html')
@@ -131,25 +124,24 @@ def wall():
         if not toxic:
             db.session.add(Confession(content=text, author=session['username'], session_id=session['user_id'], parent_id=p_id, toxicity_score=score))
             db.session.commit()
+            flash("Reply added.", "success")
     posts = Confession.query.filter_by(parent_id=None).order_by(Confession.id.desc()).all()
     return render_template('wall.html', posts=posts)
-
-@app.route('/my-secrets')
-def profile():
-    if 'user_id' not in session: return redirect(url_for('login'))
-    posts = Confession.query.filter_by(session_id=session['user_id']).all()
-    return render_template('profile.html', posts=posts)
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if request.method == 'POST':
         if request.form.get('password') == "admin123":
             session['is_admin'] = True
+            session.permanent = False # Session dies when browser closes
             return redirect(url_for('admin'))
         else:
-            flash("Invalid Password", "danger")
+            flash("Wrong Password", "danger")
 
-    posts = Confession.query.order_by(Confession.toxicity_score.desc()).all() if session.get('is_admin') else []
+    if session.get('is_admin'):
+        posts = Confession.query.order_by(Confession.toxicity_score.desc()).all()
+    else:
+        posts = []
     return render_template('admin.html', posts=posts)
 
 @app.route('/admin-logout')
