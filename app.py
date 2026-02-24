@@ -4,13 +4,15 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
+# 1. LOAD CONFIG
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "voidspeak_final_999")
+app.secret_key = os.getenv("SECRET_KEY", "voidspeak_final_ultra_999")
 
-# --- DATABASE CONFIG ---
+# 2. DATABASE CONFIG (Neon Cloud or Local SQLite)
 db_url = os.getenv("DATABASE_URL")
 if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -21,18 +23,17 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"connect_timeout": 1
 
 db = SQLAlchemy(app)
 
-# --- GEMINI AI CONFIG ---
+# 3. GEMINI AI CONFIG (With Professional Safety Bypass)
 AI_KEY = os.getenv("GEMINI_API_KEY")
+model = None
 if AI_KEY:
     try:
         genai.configure(api_key=AI_KEY)
         model = genai.GenerativeModel('gemini-pro')
-    except:
-        model = None
-else:
-    model = None
+    except Exception as e:
+        print(f"AI Config Error: {e}")
 
-# --- DATABASE MODEL ---
+# 4. DATABASE MODEL
 class Confession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.String(500), nullable=False)
@@ -41,32 +42,51 @@ class Confession(db.Model):
     parent_id = db.Column(db.Integer, db.ForeignKey('confession.id'), nullable=True)
     replies = db.relationship('Confession', backref=db.backref('parent', remote_side=[id]), lazy=True, cascade="all, delete")
 
-# --- AUTO-CREATE TABLES ---
+# 5. INITIALIZE TABLES (For Render)
 with app.app_context():
     try:
         db.create_all()
     except Exception as e:
-        print(f"DB Error: {e}")
+        print(f"Startup DB Error: {e}")
 
-# --- STRICT AI TOXICITY CHECKER ---
-def check_toxicity(text):
-    if not model: return "CLEAN"
+# 6. MODERATION LOGIC
+# Layer 1: Local Hardcoded Filter (Instant)
+BANNED_WORDS = ["fuck", "bitch", "shit", "asshole", "bastard", "dick", "pussy"]
+
+def is_toxic(text):
+    """Combines Local Filter and AI Analysis"""
+    raw_text = text.lower()
+    
+    # Check Local Filter first
+    for word in BANNED_WORDS:
+        if word in raw_text:
+            return True, f"TOXIC: [{word}]"
+
+    # Layer 2: Gemini AI Analysis
+    if not model:
+        return False, "CLEAN"
+    
     try:
-        # Strict prompt to force Gemini to flag profanity
-        prompt = f"""
-        ACT AS A STRICT CONTENT MODERATOR. 
-        Analyze this text: "{text}"
-        If it contains ANY swear words, insults, or hate speech, you MUST return: "TOXIC: [words]".
-        If it is 100% safe, return "CLEAN".
-        Example: "fuck you" -> TOXIC: [fuck]
-        Example: "you are a loser" -> TOXIC: [loser]
-        """
-        response = model.generate_content(prompt)
-        return response.text.strip().upper()
-    except:
-        return "CLEAN"
+        # These settings tell Gemini NOT to block the request, but to analyze it
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
 
-# --- ROUTES ---
+        prompt = f"Moderate this text: '{text}'. If it contains profanity, insults, or toxicity, reply ONLY with 'TOXIC'. Otherwise reply 'CLEAN'."
+        response = model.generate_content(prompt, safety_settings=safety_settings)
+        
+        result = response.text.strip().upper()
+        print(f"AI Decision: {result}") # Visible in Render Logs
+        
+        return ("TOXIC" in result), result
+    except Exception as e:
+        print(f"AI Error: {e}")
+        return False, "CLEAN"
+
+# 7. ROUTES
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -78,7 +98,9 @@ def about():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        session['username'] = f"{random.choice(['Salty', 'Cringe', 'Moody', 'Epic'])}{random.choice(['Potato', 'Wizard', 'Ninja', 'Taco'])}{random.randint(10, 99)}"
+        adj = ["Cringe", "Salty", "Moody", "Epic", "Savage", "Goofy", "Ghostly", "Neon"]
+        noun = ["Potato", "Wizard", "Cactus", "Ninja", "Banana", "Taco", "Panda", "Void"]
+        session['username'] = f"{random.choice(adj)}{random.choice(noun)}{random.randint(10, 99)}"
         if 'user_id' not in session: session['user_id'] = os.urandom(16).hex()
         return redirect(url_for('wall'))
     return render_template('identity.html')
@@ -88,13 +110,16 @@ def whisper():
     if 'username' not in session: return redirect(url_for('login'))
     if request.method == 'POST':
         text = request.form.get('confession')
-        result = check_toxicity(text)
-        if "TOXIC" in result:
-            flash(f"⚠️ REJECTED: {result}", "danger")
+        toxic, reason = is_toxic(text)
+        
+        if toxic:
+            flash(f"⚠️ {reason}. Please keep Voidspeak clean!", "danger")
             return render_template('whisper.html', last_text=text)
+        
         new_post = Confession(content=text, author=session['username'], session_id=session['user_id'])
         db.session.add(new_post)
         db.session.commit()
+        flash("Whisper absorbed.", "success")
         return redirect(url_for('wall'))
     return render_template('whisper.html')
 
@@ -104,12 +129,14 @@ def wall():
     if request.method == 'POST':
         text = request.form.get('confession')
         p_id = request.form.get('parent_id')
-        if "TOXIC" in check_toxicity(text):
+        toxic, _ = is_toxic(text)
+        if toxic:
             flash("⚠️ Toxic reply blocked!", "danger")
         else:
             reply = Confession(content=text, author=session['username'], session_id=session['user_id'], parent_id=p_id)
             db.session.add(reply)
             db.session.commit()
+            flash("Reply added.", "success")
     posts = Confession.query.filter_by(parent_id=None).order_by(Confession.id.desc()).all()
     return render_template('wall.html', posts=posts)
 
